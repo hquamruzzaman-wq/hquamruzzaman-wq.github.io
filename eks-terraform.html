@@ -1,0 +1,509 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <title>Production EKS Cluster with Terraform | Hawlader Md Quamruzzaman</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="description"
+        content="Production-style Amazon EKS cluster built with modular Terraform, including VPC, EKS, IAM/IRSA modules, ALB ingress readiness, and ephemeral cost-optimized testing." />
+  <style>
+    :root {
+      --bg: #0b1020;
+      --bg-alt: #141a2a;
+      --card: #171e30;
+      --accent: #4f46e5;
+      --accent-soft: rgba(79, 70, 229, 0.12);
+      --text: #e5e7eb;
+      --muted: #9ca3af;
+      --border: #1f2937;
+      --badge-bg: #111827;
+      --badge-border: #374151;
+      --radius-lg: 18px;
+      --shadow-soft: 0 18px 45px rgba(0, 0, 0, 0.55);
+      --shadow-subtle: 0 10px 30px rgba(0, 0, 0, 0.45);
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      background: radial-gradient(circle at top left, #111827 0, #020617 50%, #000 100%);
+      color: var(--text);
+      line-height: 1.6;
+      padding: 0;
+      margin: 0;
+    }
+
+    a { color: inherit; text-decoration: none; }
+
+    .page {
+      max-width: 1100px;
+      margin: 0 auto;
+      padding: 28px 18px 60px;
+    }
+
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 16px;
+      margin-bottom: 24px;
+    }
+
+    .logo-text {
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      font-size: 14px;
+      text-transform: uppercase;
+      color: var(--muted);
+    }
+
+    nav a {
+      font-size: 14px;
+      color: var(--muted);
+      margin-left: 18px;
+      position: relative;
+    }
+
+    nav a::after {
+      content: "";
+      position: absolute;
+      left: 0;
+      bottom: -4px;
+      width: 0;
+      height: 2px;
+      background: linear-gradient(90deg, #22d3ee, #4f46e5);
+      transition: width 0.2s ease;
+    }
+
+    nav a:hover::after { width: 100%; }
+
+    .hero {
+      background: radial-gradient(circle at top left, #111827 0, #020617 55%, #000 100%);
+      border-radius: 24px;
+      border: 1px solid var(--border);
+      padding: 22px 24px 20px;
+      box-shadow: var(--shadow-soft);
+      margin-bottom: 26px;
+    }
+
+    .eyebrow {
+      font-size: 12px;
+      letter-spacing: 0.16em;
+      text-transform: uppercase;
+      color: var(--muted);
+      margin-bottom: 8px;
+    }
+
+    .hero-title {
+      font-size: 26px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+
+    .hero-title span {
+      background: linear-gradient(90deg, #22d3ee, #a855f7);
+      -webkit-background-clip: text;
+      background-clip: text;
+      color: transparent;
+    }
+
+    .hero-subtitle {
+      font-size: 14px;
+      color: var(--muted);
+      margin-bottom: 14px;
+    }
+
+    .hero-meta {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      margin-bottom: 14px;
+    }
+
+    .pill {
+      background: var(--badge-bg);
+      border-radius: 999px;
+      border: 1px solid var(--badge-border);
+      padding: 4px 10px;
+      font-size: 11px;
+      color: var(--muted);
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .pill strong { color: #f9fafb; }
+
+    .hero-actions {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 10px;
+      margin-top: 6px;
+    }
+
+    .btn {
+      border-radius: 999px;
+      font-size: 14px;
+      padding: 7px 14px;
+      cursor: pointer;
+      border: none;
+      display: inline-flex;
+      align-items: center;
+      gap: 8px;
+      transition: transform 0.1s ease, box-shadow 0.1s ease, background 0.15s ease;
+      text-decoration: none;
+    }
+
+    .btn-primary {
+      background: linear-gradient(135deg, #22d3ee, #4f46e5);
+      color: #0b1020;
+      font-weight: 600;
+      box-shadow: 0 10px 32px rgba(37, 99, 235, 0.55);
+    }
+
+    .btn-primary:hover {
+      transform: translateY(-1px);
+      box-shadow: 0 14px 42px rgba(37, 99, 235, 0.75);
+    }
+
+    .btn-ghost {
+      background: rgba(15, 23, 42, 0.9);
+      color: var(--muted);
+      border: 1px solid var(--border);
+    }
+
+    .btn-ghost:hover {
+      background: rgba(15, 23, 42, 1);
+      transform: translateY(-1px);
+      box-shadow: var(--shadow-subtle);
+    }
+
+    section { margin-bottom: 24px; }
+
+    .section-title {
+      font-size: 17px;
+      font-weight: 600;
+      margin-bottom: 6px;
+    }
+
+    .section-sub {
+      font-size: 12px;
+      color: var(--muted);
+      margin-bottom: 10px;
+    }
+
+    .card {
+      background: var(--card);
+      border-radius: var(--radius-lg);
+      border: 1px solid var(--border);
+      padding: 14px 16px;
+      margin-bottom: 14px;
+      box-shadow: var(--shadow-subtle);
+    }
+
+    .card h3 {
+      font-size: 15px;
+      margin-bottom: 6px;
+    }
+
+    .card p {
+      font-size: 13px;
+      color: var(--muted);
+      margin-bottom: 6px;
+    }
+
+    ul {
+      padding-left: 18px;
+      margin: 4px 0 6px;
+      font-size: 13px;
+      color: var(--muted);
+    }
+
+    li + li { margin-top: 4px; }
+
+    pre {
+      background: #020617;
+      border-radius: 14px;
+      border: 1px solid #111827;
+      padding: 10px 12px;
+      font-size: 11px;
+      overflow-x: auto;
+      color: #9ca3af;
+      margin-top: 6px;
+      margin-bottom: 6px;
+    }
+
+    code {
+      font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+      font-size: 12px;
+      background: rgba(15, 23, 42, 0.9);
+      border-radius: 4px;
+      padding: 2px 4px;
+    }
+
+    .tag-row {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 6px;
+      margin-top: 6px;
+    }
+
+    .tag {
+      font-size: 11px;
+      padding: 2px 8px;
+      border-radius: 999px;
+      border: 1px solid var(--badge-border);
+      color: var(--muted);
+      background: #020617;
+    }
+
+    footer {
+      margin-top: 24px;
+      padding-top: 12px;
+      border-top: 1px solid var(--border);
+      font-size: 12px;
+      color: var(--muted);
+      display: flex;
+      flex-wrap: wrap;
+      justify-content: space-between;
+      gap: 6px;
+    }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header>
+      <div class="logo-text">HAWLADER MD QUAMRUZZAMAN</div>
+      <nav>
+        <a href="index.html">← Back to Portfolio</a>
+      </nav>
+    </header>
+
+    <section class="hero">
+      <div class="eyebrow">Project Detail · AWS · EKS · Terraform</div>
+      <h1 class="hero-title">
+        Production-style <span>Amazon EKS Cluster</span> with Modular Terraform
+      </h1>
+      <p class="hero-subtitle">
+        A fully codified, reusable Terraform project that provisions a production-style EKS cluster:
+        multi-AZ VPC, managed node group, IRSA, ALB-ready networking, and a clean build → test → destroy workflow
+        designed for ~1–2 hour test runs to control cost.
+      </p>
+      <div class="hero-meta">
+        <span class="pill">☸️ <strong>EKS</strong> · Terraform · AWS</span>
+        <span class="pill">🏗️ Modular VPC / EKS / IAM-IRSA</span>
+        <span class="pill">⏱️ Ephemeral: Build → Test → Destroy</span>
+        <span class="pill">💰 Cost-aware, ~2 hours per run</span>
+      </div>
+      <div class="hero-actions">
+        <!-- TODO: Update to actual repo link when ready -->
+        <a class="btn btn-primary" href="https://github.com/hquamruzzaman-wq" target="_blank" rel="noreferrer">
+          View Code on GitHub
+        </a>
+        <a class="btn btn-ghost" href="#runbook">
+          Jump to Runbook
+        </a>
+      </div>
+    </section>
+
+    <!-- Overview -->
+    <section>
+      <div class="section-title">1. High-Level Overview</div>
+      <div class="card">
+        <p>
+          This project implements a production-style Amazon EKS cluster using Terraform with a modular architecture.
+          The environment is built to be ephemeral: provision the cluster, run tests or PoCs for 1–2 hours, and then
+          destroy everything cleanly to avoid unnecessary AWS spend.
+        </p>
+        <ul>
+          <li>Modular Terraform design: <strong>root module</strong> plus dedicated <strong>VPC</strong>, <strong>EKS</strong>, and <strong>IAM-IRSA</strong> modules.</li>
+          <li>Secure, multi-AZ <strong>VPC</strong> with public and private subnets, IGW, NAT Gateways, and route tables following AWS Well-Architected best practices.</li>
+          <li><strong>EKS cluster</strong> with managed node group, IAM roles, control plane logging, and OIDC provider for IRSA.</li>
+          <li><strong>IRSA support</strong> via a generic IAM module for AWS Load Balancer Controller, Cluster Autoscaler and other add-ons.</li>
+          <li>Designed to be extended with <strong>ALB Ingress Controller</strong>, observability stacks, and CI/CD integration.</li>
+        </ul>
+        <div class="tag-row">
+          <span class="tag">AWS EKS</span>
+          <span class="tag">Terraform</span>
+          <span class="tag">VPC (multi-AZ)</span>
+          <span class="tag">IAM / IRSA</span>
+          <span class="tag">ALB-ready</span>
+          <span class="tag">Ephemeral Environments</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- Architecture -->
+    <section>
+      <div class="section-title">2. Architecture</div>
+      <div class="section-sub">Core components provisioned with Terraform</div>
+      <div class="card">
+        <h3>VPC & Networking</h3>
+        <ul>
+          <li>Single VPC with CIDR (e.g. <code>10.0.0.0/16</code>).</li>
+          <li>Multiple <strong>public subnets</strong> and <strong>private subnets</strong> spread across at least 2–3 AZs.</li>
+          <li>Internet Gateway attached to the VPC for outbound access from public subnets.</li>
+          <li>NAT Gateways in public subnets providing outbound access for workloads in private subnets.</li>
+          <li>Subnet tagging for EKS and ALB usage:
+            <ul>
+              <li><code>kubernetes.io/role/elb = 1</code> for public subnets.</li>
+              <li><code>kubernetes.io/role/internal-elb = 1</code> for private subnets.</li>
+            </ul>
+          </li>
+        </ul>
+
+        <h3 style="margin-top:10px;">EKS Cluster</h3>
+        <ul>
+          <li>Amazon EKS control plane deployed into the VPC with cluster logging enabled (API, audit, authenticator).</li>
+          <li>Managed node group using <code>t3.*</code> instances running in private subnets.</li>
+          <li>Cluster endpoint configuration for secure access and kubectl usage.</li>
+          <li>IAM roles for:
+            <ul>
+              <li>EKS control plane (<code>AmazonEKSClusterPolicy</code>, <code>AmazonEKSServicePolicy</code>).</li>
+              <li>Worker nodes (<code>AmazonEKSWorkerNodePolicy</code>, <code>AmazonEC2ContainerRegistryReadOnly</code>, <code>AmazonEKS_CNI_Policy</code>).</li>
+            </ul>
+          </li>
+        </ul>
+
+        <h3 style="margin-top:10px;">IAM-IRSA</h3>
+        <ul>
+          <li>OIDC provider automatically created for the EKS cluster.</li>
+          <li>Generic IRSA module to_issue IAM roles for Kubernetes service accounts.</li>
+          <li>Trust policy wired using OIDC subject claims:
+            <code>system:serviceaccount:&lt;namespace&gt;:&lt;serviceAccountName&gt;</code>.
+          </li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Repo Structure -->
+    <section>
+      <div class="section-title">3. Terraform Project Structure</div>
+      <div class="card">
+        <p>Terraform is organized into a root module and three submodules:</p>
+        <pre>
+terraform-eks-prod/
+  main.tf
+  variables.tf
+  outputs.tf
+  providers.tf
+  modules/
+    vpc/
+      main.tf
+      variables.tf
+      outputs.tf
+    eks/
+      main.tf
+      variables.tf
+      outputs.tf
+    iam-irsa/
+      main.tf
+      variables.tf
+      outputs.tf
+        </pre>
+        <ul>
+          <li><strong>Root module</strong>: wires VPC, EKS, and IRSA modules; defines region, cluster name, and scaling variables.</li>
+          <li><strong>VPC module</strong>: creates the multi-AZ VPC, subnets, IGW, NAT Gateways, route tables, and tags.</li>
+          <li><strong>EKS module</strong>: creates the EKS cluster, related IAM roles, security groups, node group, and OIDC provider.</li>
+          <li><strong>IAM-IRSA module</strong>: provisions IAM roles for service accounts using the EKS OIDC provider.</li>
+        </ul>
+      </div>
+    </section>
+
+    <!-- Runbook -->
+    <section id="runbook">
+      <div class="section-title">4. Runbook – Build → Test → Destroy</div>
+      <div class="section-sub">How to spin up the cluster for a 1–2 hour test window and tear it down cleanly</div>
+
+      <div class="card">
+        <h3>4.1 Prerequisites</h3>
+        <ul>
+          <li>AWS account with permissions to create EKS, EC2, VPC, IAM, and CloudWatch resources.</li>
+          <li><code>awscli</code> installed and configured (<code>aws configure</code>).</li>
+          <li><code>terraform</code> v1.x installed.</li>
+          <li><code>kubectl</code> installed.</li>
+        </ul>
+      </div>
+
+      <div class="card">
+        <h3>4.2 Initialize Terraform</h3>
+        <pre>
+$ terraform init
+$ terraform validate
+        </pre>
+        <p>
+          The project includes the necessary providers, including <code>hashicorp/aws</code> and
+          <code>hashicorp/tls</code> (required for the EKS OIDC TLS certificate).
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>4.3 Plan & Apply</h3>
+        <pre>
+$ terraform plan -out=tfplan
+$ terraform apply tfplan
+        </pre>
+        <p>
+          Terraform creates the VPC, subnets, NAT Gateways, EKS cluster, node group, security groups, IAM roles
+          and OIDC provider. Provisioning typically takes several minutes.
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>4.4 Configure kubectl</h3>
+        <pre>
+$ aws eks update-kubeconfig --region &lt;aws-region&gt; --name &lt;cluster-name&gt;
+$ kubectl get nodes
+        </pre>
+        <p>
+          Once the nodes are in <code>Ready</code> state, you can deploy workloads, ingress controllers (e.g. AWS
+          Load Balancer Controller), and observability components.
+        </p>
+      </div>
+
+      <div class="card">
+        <h3>4.5 Destroy After Testing (Cost Control)</h3>
+        <pre>
+$ terraform plan -destroy -out=tfdestroy
+$ terraform apply tfdestroy
+        </pre>
+        <p>
+          Destroying the environment removes the EKS cluster, node groups, NAT Gateways, load balancers, EBS volumes,
+          subnets, and the VPC. This pattern allows running realistic EKS experiments for 1–2 hours while keeping
+          overall cost very low.
+        </p>
+      </div>
+    </section>
+
+    <!-- Cost Awareness -->
+    <section>
+      <div class="section-title">5. Cost-Aware Design</div>
+      <div class="card">
+        <p>
+          The project specifically targets short-lived, realistic EKS test environments. By running the cluster only
+          for 1–2 hours and then destroying it, the main costs are:
+        </p>
+        <ul>
+          <li><strong>EKS control plane hourly charge</strong>.</li>
+          <li><strong>EC2 worker nodes</strong> (e.g. <code>t3.medium</code> or <code>t3.small</code> in a single node group).</li>
+          <li><strong>NAT Gateways</strong> and any <strong>load balancers</strong> created for ingress testing.</li>
+          <li>Small amounts of EBS storage and CloudWatch logging.</li>
+        </ul>
+        <p>
+          The architecture is flexible enough to tweak instance types, node counts and NAT strategy (one NAT vs per-AZ)
+          depending on budget vs realism requirements.
+        </p>
+      </div>
+    </section>
+
+    <footer>
+      <div>© <span id="year"></span> Hawlader Md Quamruzzaman · Production EKS Cluster with Terraform</div>
+      <div><a href="index.html">Back to main portfolio →</a></div>
+    </footer>
+  </div>
+  <script>
+    document.getElementById("year").textContent = new Date().getFullYear();
+  </script>
+</body>
+</html>
